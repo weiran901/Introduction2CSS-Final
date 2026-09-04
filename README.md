@@ -111,7 +111,7 @@ source .venv/bin/activate
 Install dependencies:
 
 ```bash
-pip install -r requirements.txt
+pip install datasets joblib matplotlib numpy pandas pyarrow scikit-learn
 ```
 
 ## Run the Analysis

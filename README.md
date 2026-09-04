@@ -99,28 +99,6 @@ The sixth slot shows weaker position-adjusted, out-of-sample performance than ne
 
 Commercial exposure partially explains the recurring sixth-slot CTR penalty, but it is not the whole story. The anomaly may involve the candidate-selection or serving mechanism itself, not only ad exposure. A practical next step would be to audit these recurring slots and run A/B tests with alternative candidate-selection strategies.
 
-## Repository Structure
-
-```text
-.
-|-- Presentation.pdf                # Final project presentation
-|-- analysis.ipynb                  # Notebook entry point for exploratory analysis
-|-- newmodel.ipynb                  # Notebook entry point for model training/evaluation
-|-- data/
-|   `-- qilin_note_metadata_final.parquet
-|-- src/
-|   `-- qilin_recommender/
-|       |-- analysis.py             # EDA report generation
-|       |-- data.py                 # Data loading and request flattening
-|       |-- metrics.py              # Ranking metrics
-|       `-- model.py                # Baseline click prediction model
-|-- requirements.txt
-|-- pyproject.toml
-|-- setup.cfg
-|-- setup.py
-`-- README.md
-```
-
 ## Setup
 
 Create and activate a virtual environment:
@@ -170,7 +148,3 @@ The training script downloads the required Qilin recommendation configs from Hug
 ## Reference
 
 Chen, J., Dong, Q., Li, H., He, X., Gao, Y., Cao, S., Wu, Y., Yang, P., Xu, C., Hu, Y., Ai, Q., & Liu, Y. (2025). Qilin: A multimodal information retrieval dataset with APP-level user sessions. In *Proceedings of the 48th International ACM SIGIR Conference on Research and Development in Information Retrieval* (pp. 3670-3680). Association for Computing Machinery. https://doi.org/10.1145/3726302.3730279
-
-## Notes for GitHub
-
-The `.gitignore` excludes the local virtual environment, generated reports, trained models, caches, and temporary notebook files. When creating the GitHub repository, commit the source files and prepared metadata file, but do not commit `.venv/`, `hf_cache/`, `reports/`, or `models/`.

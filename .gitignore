@@ -21,6 +21,7 @@ outputs/
 # Hugging Face / local caches
 .cache/
 hf_cache/
+tmp/
 
 # Large raw data files should stay outside git unless intentionally curated.
 data/raw/

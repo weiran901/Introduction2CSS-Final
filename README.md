@@ -1,11 +1,109 @@
-# Qilin Xiaohongshu Recommendation Project
+# Investigating a Recurring Click-Through Rate Anomaly in Xiaohongshu Recommendations
 
-This repository contains a final project exploring recommendation behavior in the Qilin/Xiaohongshu dataset. The project includes exploratory data analysis of note-level metadata and a baseline learning-to-rank style click prediction model for recommendation candidates.
+This repository contains the code and materials for a final project on recommendation behavior in Xiaohongshu, using the public Qilin dataset. The project investigates a recurring click-through rate (CTR) dip at the sixth recommendation position within repeated seven-item blocks.
 
-## Project Structure
+The project moves from an initial commercial-exposure explanation toward a candidate-selection explanation: commercial content helps explain the pattern, but it does not fully account for the recurring engagement penalty.
+
+## Research Question
+
+CTR usually declines as recommendation rank gets lower. In the Qilin recommendation logs, however, the sixth position shows an unusually sharp CTR drop. The project asks:
+
+> Why does the sixth slot within each seven-position recommendation block receive lower engagement?
+
+The Qilin paper suggests that some positions may have a higher probability of exposing commercial notes. This project tests that idea and then examines whether the anomaly remains after controlling for observable note, topic, and user-context factors.
+
+## Main Hypotheses
+
+1. Commercial exposure hypothesis: the sixth slot has lower CTR because it contains more commercial content.
+2. Position-structure hypothesis: the penalty is not limited to absolute rank 6, but recurs at positions 6, 13, 20, 27, and so on.
+3. Candidate-selection hypothesis: even after adjusting for position and observable context, the sixth slot receives candidates with weaker out-of-sample click performance.
+
+## Data
+
+The project uses the Hugging Face dataset `THUIR/Qilin`, especially the recommendation logs and note metadata. Qilin stores train/test recommendation data as separate dataset configs:
+
+- `recommendation_train`
+- `recommendation_test`
+- `notes`
+- `user_feat`
+
+The local prepared metadata file is:
+
+```text
+data/qilin_note_metadata_final.parquet
+```
+
+It includes fields such as `note_idx`, `commercial_flag`, `note_type`, `content_length`, `image_num`, `video_duration`, `taxonomy1_id`, `imp_rec_num`, and `click_rec_num`.
+
+## Methodology
+
+### 1. Commercial Flag Analysis
+
+Notes are classified using `commercial_flag`:
+
+- commercial content: `commercial_flag != 0`
+- non-commercial content: `commercial_flag == 0`
+
+Initial evidence shows that commercial content is strongly concentrated at the sixth position. The same pattern appears repeatedly at positions 6, 13, 20, 27, and later slots, suggesting a recurring seven-position serving structure.
+
+### 2. Seven-Position Structure
+
+Each recommendation position is converted into:
+
+- block: the group of seven positions the item belongs to
+- within-block position: the item's location inside that seven-position block
+
+For example:
+
+```text
+Block 1: 1, 2, 3, 4, 5, 6, 7
+Block 2: 8, 9, 10, 11, 12, 13, 14
+Block 3: 15, 16, 17, 18, 19, 20, 21
+```
+
+Positions 6, 13, and 20 all correspond to within-block position 6.
+
+### 3. Logistic Regression Models
+
+The main regression tests whether the sixth within-block position has lower click probability:
+
+```text
+Click ~ C(Block) + C(WithinBlockPosition)
+```
+
+Additional models add controls for commercial exposure, content type/format, topic, and user context. If these controls fully explained the anomaly, the sixth-slot coefficient would move toward zero and the odds ratio would move toward one.
+
+In the presentation results, the sixth-slot odds ratio remains below one after controls, which means observable controls do not fully eliminate the penalty.
+
+### 4. Cross-Fitted Candidate Quality
+
+The revised approach estimates expected click probability from position and context, then measures each candidate's performance relative to that expectation:
+
+```text
+adjusted_performance = click - expected_click_probability
+```
+
+Cross-fitting is used so that each observation is evaluated by a model that was not trained on that same observation. This helps separate genuine candidate quality from in-sample overfitting.
+
+The sixth slot shows weaker position-adjusted, out-of-sample performance than neighboring positions, supporting the candidate-selection explanation.
+
+## Key Findings
+
+- CTR declines with rank overall, but the sixth slot shows an unusually sharp dip.
+- Commercial content is concentrated at the sixth slot and recurs every seven positions.
+- Removing commercial content does not eliminate the CTR dip.
+- Logistic regression controls reduce but do not fully explain the sixth-slot penalty.
+- Cross-fitted adjusted performance suggests that sixth-slot candidates are weaker even after accounting for position and context.
+
+## Conclusion
+
+Commercial exposure partially explains the recurring sixth-slot CTR penalty, but it is not the whole story. The anomaly may involve the candidate-selection or serving mechanism itself, not only ad exposure. A practical next step would be to audit these recurring slots and run A/B tests with alternative candidate-selection strategies.
+
+## Repository Structure
 
 ```text
 .
+|-- Presentation.pdf                # Final project presentation
 |-- analysis.ipynb                  # Notebook entry point for exploratory analysis
 |-- newmodel.ipynb                  # Notebook entry point for model training/evaluation
 |-- data/
@@ -22,20 +120,6 @@ This repository contains a final project exploring recommendation behavior in th
 |-- setup.py
 `-- README.md
 ```
-
-## Dataset
-
-The project uses the public Hugging Face dataset `THUIR/Qilin`. Qilin separates recommendation train/test data as dataset configs rather than Hugging Face split names:
-
-- `recommendation_train`
-- `recommendation_test`
-- `search_train`
-- `search_test`
-- `notes`
-- `user_feat`
-- `dqa`
-
-The local file `data/qilin_note_metadata_final.parquet` is a prepared note metadata table with fields such as `note_idx`, `commercial_flag`, `note_type`, `content_length`, `image_num`, `video_duration`, `taxonomy1_id`, `imp_rec_num`, and `click_rec_num`.
 
 ## Setup
 
@@ -66,7 +150,7 @@ This creates summary tables and figures under `reports/`:
 - `reports/figures/prior_ctr_distribution.png`
 - `reports/figures/top_taxonomies_by_impressions.png`
 
-## Train the New Model
+## Train the Baseline Model
 
 ```bash
 PYTHONPATH=src python -m qilin_recommender.model
@@ -83,21 +167,10 @@ The training script downloads the required Qilin recommendation configs from Hug
 - `models/new_model.joblib`
 - `reports/new_model_metrics.json`
 
-## Model Overview
+## Reference
 
-The model is a baseline logistic regression classifier that predicts whether a displayed recommendation candidate receives a click. Request-level recommendation logs are flattened into candidate-level rows, then joined with note metadata.
-
-Features include:
-
-- request/context features: query length, recent click count, recommendation position
-- note metadata: note type, content length, image count, video duration, commercial flag
-- popularity signals: recommendation impressions, recommendation clicks, historical CTR
-- taxonomy category: `taxonomy1_id`
-
-Evaluation reports ROC-AUC, average precision, click rate, and mean NDCG@10 across recommendation requests.
+Chen, J., Dong, Q., Li, H., He, X., Gao, Y., Cao, S., Wu, Y., Yang, P., Xu, C., Hu, Y., Ai, Q., & Liu, Y. (2025). Qilin: A multimodal information retrieval dataset with APP-level user sessions. In *Proceedings of the 48th International ACM SIGIR Conference on Research and Development in Information Retrieval* (pp. 3670-3680). Association for Computing Machinery. https://doi.org/10.1145/3726302.3730279
 
 ## Notes for GitHub
 
-The `.gitignore` excludes the local virtual environment, generated reports, trained models, caches, and temporary notebook files. The current repository is designed so another user can clone it, install dependencies, and rerun the analysis/model pipeline from the source code.
-
-If you are creating a new GitHub repository from this folder, add the source files and the prepared metadata file, but do not commit `.venv/`, `hf_cache/`, `reports/`, or `models/`.
+The `.gitignore` excludes the local virtual environment, generated reports, trained models, caches, and temporary notebook files. When creating the GitHub repository, commit the source files and prepared metadata file, but do not commit `.venv/`, `hf_cache/`, `reports/`, or `models/`.
